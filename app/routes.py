@@ -1,4 +1,4 @@
-from flask import render_template, render_template_string, redirect, url_for, flash, session, request
+from flask import render_template, redirect, url_for, flash, session, request
 from flask_login import login_user, logout_user, current_user, login_required
 from app import db, oauth, login_manager
 from app.forms import (LoginForm, RegisterForm, NickNameForm, SelectWeekForm, FixtureForm, PredictionForm,
@@ -25,6 +25,7 @@ def remote_template(template):
         return template_content
     else:
         return "Error fetching template", 500
+
 
 accounts = [
     {'full_name': 'John Smith', 'email': 'john.smith@example.com', 'nickname': 'Johnny', 'password': 'Password123'}, 
@@ -138,7 +139,7 @@ def register_routes(app):
             flash('Account created successfully.', 'success')
             return redirect(url_for('login'))
         #temp = remote_template('register.html')
-        return render_template_string('register.html', title='Register', form=form)
+        return render_template('register.html', title='Register', form=form)
 
 
     @app.route('/login', methods=['GET', 'POST'])
@@ -152,7 +153,7 @@ def register_routes(app):
                 return redirect(url_for('home'))
             flash('Invalid credentials.', 'danger')
         #temp = remote_template('login.html')    
-        return render_template_string('login.html', title='Login', form=form)
+        return render_template('login.html', title='Login', form=form)
 
 
 

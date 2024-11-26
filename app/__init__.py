@@ -5,21 +5,6 @@ from flask_login import LoginManager
 from flask_bootstrap import Bootstrap5
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
-import awsgi
-import boto3
-
-from aws_lambda_wsgi import response
-from werkzeug.middleware.proxy_fix import ProxyFix
-
-
-
-
-def get_ssm_parameter(name):
-    client = boto3.client('ssm')
-    response = client.get_parameter(Name=name, WithDecryption=True)
-    return response['Parameter']['Value']
-
-
 
 
 # Load environment variables
@@ -38,14 +23,9 @@ def create_app():
 
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
     # Set the SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('AWS_DB_URI')#, 'sqlite:///site.db')  # Use environment variable or default to SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLITE_DB_URI')#, 'sqlite:///site.db')  # Use environment variable or default to SQLite
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
-    
-    # USING AWS SESSION MANAGER PARAMENTER STORE
-    # app.config['SECRET_KEY'] = get_ssm_parameter('/myapp/SECRET_KEY')
-    # app.config['SQLALCHEMY_DATABASE_URI'] = get_ssm_parameter('/myapp/DATABASE_URI')
-
     # Initialize extensions
     db.init_app(app)
 
@@ -54,8 +34,6 @@ def create_app():
 
     Bootstrap5(app)
 
-    # Apply middleware for AWS compatibility
-    app.wsgi_app = ProxyFix(app.wsgi_app)
     # Register the `user_loader` function
     from .models import User
 
@@ -71,7 +49,4 @@ def create_app():
     with app.app_context():
         db.create_all()
         
-    # # Lambda handler
-    # def lambda_handler(event, context):
-    #     return response(app, event, context)
     return app
