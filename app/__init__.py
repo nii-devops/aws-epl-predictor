@@ -23,7 +23,7 @@ def create_app():
 
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
     # Set the SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLITE_DB_URI')#, 'sqlite:///site.db')  # Use environment variable or default to SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('AWS_DB_URI')#, 'sqlite:///site.db')  # Use environment variable or default to SQLite
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize extensions
