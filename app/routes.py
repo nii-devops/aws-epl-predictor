@@ -189,7 +189,7 @@ def register_routes(app):
             # Generate a nonce and store it in the session
             session['nonce'] = secrets.token_urlsafe(16)
             #redirect_uri = url_for('authorize_google', _external=True)
-            redirect_uri = os.getenv('REDIRECT_URI')
+            redirect_uri = os.getenv('AWS_REDIRECT_URI')
             return google.authorize_redirect(redirect_uri)
         except Exception as e:
             app.logger.error(f"Login Error: {str(e)}")
