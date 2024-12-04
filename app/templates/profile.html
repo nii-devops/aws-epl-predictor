@@ -26,9 +26,9 @@
                     <div class="row g-0">
                         <div style="width: 160px;" class="col-md-4 justify-content-center align-items-center mt-3">
                             {% if user.picture %}
-                                <img src="{{ url_for('https://nii-webapps.s3.us-east-1.amazonaws.com/epl-predictor/static/img/profile_pictures/' ~ user.picture) }}" class="img-fluid rounded-start justify-content-center align-items-center" alt="User Profile Picture">
+                                <img src="{{ url_for('static', filename='img/profile_pictures/' ~ user.picture) }}" class="img-fluid rounded-start justify-content-center align-items-center" alt="User Profile Picture">
                             {% else %}
-                                <img src="{{ url_for('https://nii-webapps.s3.us-east-1.amazonaws.com/epl-predictor/static/img/profile_pictures/profile_pic.jpg') }}" class="img-fluid rounded-start justify-content-center align-items-center" alt="User Profile Picture">
+                                <img src="{{ url_for('static', filename='img/profile_pictures/profile_pic.jpg') }}" class="img-fluid rounded-start justify-content-center align-items-center" alt="User Profile Picture">
                             {% endif %}
                         </div>
 
@@ -49,7 +49,7 @@
                                             <h1 style="font-size: 3.5em;">N/A</h1>
                                         {% else %}
                                             <h1 style="font-size: 3.5em;">{{ position }}</h1>
-                                        {% endif points == 0 %}
+                                        {% endif %}
                                     </div>
                                 </div>
 

@@ -20,6 +20,10 @@ class User(db.Model, UserMixin):
     def __repr__(self):
         return f'<User {self.username}>'
 
+    # Establishing relationships
+    predictions = db.relationship('Prediction', back_populates='user', cascade='all, delete-orphan')  # Added cascade
+    scores = db.relationship('Score', back_populates='user', cascade='all, delete-orphan')  # Added cascade
+
 
 # Week Model
 class Week(db.Model):
@@ -27,6 +31,11 @@ class Week(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     week_number = db.Column(db.Integer, unique=True, nullable=False)
     
+    # Establishing relationships
+    fixtures    = db.relationship('Fixture', back_populates='week', cascade='all, delete-orphan')  # Added cascade
+    predictions  = db.relationship('Prediction', back_populates='week', cascade='all, delete-orphan')  # Added cascade
+    results     = db.relationship('Result', back_populates='week', cascade='all, delete-orphan')  # Added cascade
+    scores      = db.relationship('Score', back_populates='week', cascade='all, delete-orphan')  # Added cascade
 
 
 # Fixture Model
@@ -35,9 +44,9 @@ class Fixture(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     week_id     = db.Column(db.Integer, db.ForeignKey('weeks.id'), nullable=False)
     matches     = db.Column(db.JSON, nullable=False)
-    
+    # date_created = db.Column(db.String, nullable=False)
     # Establishing relationships
-    week        = db.relationship('Week', backref='fixture')
+    week        = db.relationship('Week', back_populates='fixtures')  # Updated to back_populates
 
 
 
@@ -48,22 +57,24 @@ class Prediction(db.Model):
     user_id             = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     week_id             = db.Column(db.Integer, db.ForeignKey('weeks.id'), nullable=False)
     user_predictions    = db.Column(db.JSON, nullable=False)
-    
+    # date_submitted = db.Column(db.String, nullable=False)
+
     # Establishing relationships
-    user                = db.relationship('User', backref='prediction')
-    week                = db.relationship('Week', backref='prediction')
+    user                = db.relationship('User', back_populates='predictions')  # Updated to back_populates
+    week                = db.relationship('Week', back_populates='predictions')  # Updated to back_populates
 
 
 
-# Prediction Model
+# Results Model
 class Result(db.Model):
     __tablename__ = 'results'  # Define table name
     id      = db.Column(db.Integer, primary_key=True)
     week_id = db.Column(db.Integer, db.ForeignKey('weeks.id'), nullable=False)
     results = db.Column(db.JSON, nullable=False)
-    
+    # date_submitted = db.Column(db.String, nullable=False)
+
     # Establishing relationships
-    week    = db.relationship('Week', backref='result')
+    week    = db.relationship('Week', back_populates='results', cascade='all, delete-orphan', single_parent=True)  # Added single_parent=True
 
 
 
@@ -76,8 +87,8 @@ class Score(db.Model):
     points      = db.Column(db.Integer, default=0)
 
     # Relationships
-    user        = db.relationship('User', backref='score')
-    week        = db.relationship('Week', backref='score')
+    user        = db.relationship('User', back_populates='scores')  # Updated to back_populates
+    week        = db.relationship('Week', back_populates='scores')  # Updated to back_populates
 
 
 # Score Model

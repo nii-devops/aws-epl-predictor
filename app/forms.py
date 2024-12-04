@@ -81,7 +81,7 @@ class ScoreWeekForm(FlaskForm):
 
 
 class PredictionWeekForm(FlaskForm):
-    week        = SelectField('Select Week', choices=weeks)  # Add your weeks here
+    week        = SelectField('Select Week')  # Add your weeks here
     submit      = SubmitField('Submit')
 
 

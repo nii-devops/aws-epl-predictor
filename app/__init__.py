@@ -15,33 +15,28 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 oauth = OAuth()
 
-
-
 def create_app():
-    app = Flask(__name__, static_url_path='/https://nii-webapps.s3.us-east-1.amazonaws.com/epl-predictor/static/')
+    app = Flask(__name__)
     #app.config.from_object('config.Config')
 
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-    # Set the SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('AWS_DB_URI')#, 'sqlite:///site.db')  # Use environment variable or default to SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLITE_DB_URI')  # Use environment variable or default to SQLite
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize extensions
     db.init_app(app)
-
     login_manager.init_app(app)
     login_manager.login_view = 'login'
-
     Bootstrap5(app)
 
     # Register the `user_loader` function
     from .models import User
-
     oauth.init_app(app)
 
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
+
     # Import routes
     from app.routes import register_routes
     register_routes(app)
@@ -50,3 +45,6 @@ def create_app():
         db.create_all()
         
     return app
+
+# Create the app instance
+app = create_app()

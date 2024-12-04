@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, flash, session, request
 from flask_login import login_user, logout_user, current_user, login_required
 from app import db, oauth, login_manager
 from app.forms import (LoginForm, RegisterForm, NickNameForm, SelectWeekForm, FixtureForm, PredictionForm,
-                       UserPredictionForm, EditUserForm, PasswordForm, UserEmailForm)
+                       UserPredictionForm, EditUserForm, PasswordForm, UserEmailForm, PredictionWeekForm)
 from app.models import *
 import os
 import requests
@@ -29,8 +29,13 @@ def remote_template(template):
 
 accounts = [
     {'full_name': 'John Smith', 'email': 'john.smith@example.com', 'nickname': 'Johnny', 'password': 'Password123'}, 
-    {'full_name': 'Emily Johnson', 'email': 'emily.johnson@example.com', 'nickname': 'EmJay', 'password': 'Securepass45'}, 
+    {'full_name': 'Emily Johnson', 'email': 'emily.johnson@example.com', 'nickname': 'EmJay', 'password': 'Securepass45'},
     {'full_name': 'Michael Brown', 'email': 'michael.brown@example.com', 'nickname': 'MikeB', 'password': 'Mike1234'}, 
+  ]
+"""  
+    {'full_name': 'Michael Brown', 'email': 'michael.brown@example.com', 'nickname': 'MikeB', 'password': 'Mike1234'},
+
+
     {'full_name': 'Sarah Davis', 'email': 'sarah.davis@example.com', 'nickname': 'SassySarah', 'password': 'Sarahrocks98'}, 
     {'full_name': 'David Miller', 'email': 'david.miller@example.com', 'nickname': 'Davey', 'password': 'Dmiller007'},
     {'full_name': 'Jessica Wilson', 'email': 'jessica.wilson@example.com', 'nickname': 'Jessie', 'password': 'Jessie4321'}, 
@@ -48,30 +53,13 @@ accounts = [
     {'full_name': 'Mia Thompson', 'email': 'mia.thompson@example.com', 'nickname': 'Mimi', 'password': 'Miathomp123'}, 
     {'full_name': 'William Garcia', 'email': 'william.garcia@example.com', 'nickname': 'WillG', 'password': 'Willie123'}, 
     {'full_name': 'Ava Martinez', 'email': 'ava.martinez@example.com', 'nickname': 'Avie', 'password': 'Avaava22'}
-            ]
+]
+"""
 
-
-teams_names = {
-    'ARS': 'Arsenal', 
-    'AST': 'Aston Villa', 
-    'BOU': 'Bournemouth', 
-    'BRE': 'Brentford', 
-    'BRI': 'Brighton', 
-    'CHE': 'Chelsea', 
-    'CRY': 'Crystal Palace', 
-    'EVE': 'Everton', 
-    'FUL': 'Fulham', 
-    'IPS': 'Ipswich Town', 
-    'LEI': 'Leicester City', 
-    'LIV': 'Liverpool', 
-    'MNC': 'Manchester City', 
-    'MNU': 'Manchester United', 
-    'NEW': 'Newcastle', 
-    'NFO': 'Nottingham Forest', 
-    'SOU': 'Southampton', 
-    'TOT': 'Tottenham', 
-    'WES': 'West Ham', 
-    'WOL': 'Wolves'
+teams_names = {'ARS': 'Arsenal', 'AST': 'Aston Villa', 'BOU': 'Bournemouth', 'BRE': 'Brentford', 'BRI': 'Brighton', 
+    'CHE': 'Chelsea', 'CRY': 'Crystal Palace', 'EVE': 'Everton', 'FUL': 'Fulham', 'IPS': 'Ipswich Town', 
+    'LEI': 'Leicester City', 'LIV': 'Liverpool', 'MNC': 'Manchester City', 'MNU': 'Manchester United', 'NEW': 'Newcastle', 
+    'NFO': 'Nottingham Forest', 'SOU': 'Southampton', 'TOT': 'Tottenham', 'WES': 'West Ham', 'WOL': 'Wolves'
     }
 
 
@@ -138,12 +126,14 @@ def register_routes(app):
             db.session.commit()
             flash('Account created successfully.', 'success')
             return redirect(url_for('login'))
-        #temp = remote_template('register.html')
         return render_template('register.html', title='Register', form=form)
 
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
+        if current_user.is_authenticated:
+            flash("User already logged in", 'info')
+            return redirect(url_for('home'))
         form = LoginForm()
         if form.validate_on_submit():
             user = User.query.filter_by(username=form.username.data).first()
@@ -151,8 +141,7 @@ def register_routes(app):
                 login_user(user)
                 flash('Logged in successfully.', 'success')
                 return redirect(url_for('home'))
-            flash('Invalid credentials.', 'danger')
-        #temp = remote_template('login.html')    
+            flash('Invalid credentials.', 'danger') 
         return render_template('login.html', title='Login', form=form)
 
 
@@ -188,8 +177,9 @@ def register_routes(app):
         try:
             # Generate a nonce and store it in the session
             session['nonce'] = secrets.token_urlsafe(16)
-            #redirect_uri = url_for('authorize_google', _external=True)
-            redirect_uri = os.getenv('AWS_REDIRECT_URI')
+            redirect_uri = url_for('authorize_google', _external=True)
+            #redirect_uri = os.getenv('REDIRECT_URI')
+            app.logger.info(f"Redirect URI sent to Google: {redirect_uri}")
             return google.authorize_redirect(redirect_uri)
         except Exception as e:
             app.logger.error(f"Login Error: {str(e)}")
@@ -236,9 +226,9 @@ def register_routes(app):
                 return redirect(url_for('home'))
 
         except Exception as e:
-            app.logger.error(f"Authorization Error: {str(e)}")
-            return "Error occurred during authorization!"
-    
+            app.logger.error(f"Authorization Error: {str(e)}") 
+            flash(f"Error occurred during authorization! {e}", 'danger')
+            return redirect(url_for('home'))
 
 
 
@@ -261,9 +251,11 @@ def register_routes(app):
                     )
                     db.session.add(new_user)
                     db.session.commit()
-                    login_user(new_user)
-                    flash('User registered successfully.', 'success')
-                    return redirect(url_for('home'))
+                    usr = User.query.filter_by(username=form.nickname.data).first()
+                    if usr:
+                        login_user(usr)
+                        flash('User logged in successfully.', 'success')
+                        return redirect(url_for('home'))
                 else:
                     # Generate a random string for the filename
                     random_string = secrets.token_hex(8)  # Generate a random string
@@ -278,11 +270,14 @@ def register_routes(app):
                     )
                     db.session.add(new_user)
                     db.session.commit()
-                    login_user(new_user)
-                    flash('User registered successfully.', 'success')
-                    return redirect(url_for('home'))
-            flash(f"User {form.username.data} already exists")
-            return redirect(url_for('login'))
+                    usr = User.query.filter_by(username=form.nickname.data).first()
+                    if usr:
+                        login_user(usr)
+                        flash('User logged in successfully.', 'success')
+                        return redirect(url_for('home'))
+            else:
+                flash(f"User {form.username.data} already exists")
+                return redirect(url_for('login'))
         return render_template('nickname.html', title='Set Nickname', form=form)
 
 
@@ -327,7 +322,6 @@ def register_routes(app):
     @app.route('/select-matchweek', methods=['GET', 'POST'])
     def match_week():
         form = SelectWeekForm()
-
         if form.validate_on_submit():
 
             week_number = form.week.data
@@ -336,8 +330,7 @@ def register_routes(app):
                 week_number = int(week_number)  # Convert to integer
             except ValueError:
                 flash("Invalid week number!", category='warning')
-                return render_template_string('match_week.html', title='Select Week', form=form)
-
+                return render_template('match_week.html', title='Select Week', form=form)
             # Check if the week_number already exists
             if not Week.query.filter_by(week_number=week_number).first():
                 week = Week(
@@ -363,7 +356,6 @@ def register_routes(app):
         weeks = Week.query.order_by(Week.week_number).all()  # Retrieve week numbers
         if weeks:
             form.game_week.data = max(week.week_number for week in weeks)
-        #form.game_week.choices = [(week.week_number, f"Week {week.week_number}") for week in weeks]
 
         if form.validate_on_submit():  # Check if the form is submitted and valid
             week = form.game_week.data
@@ -373,10 +365,6 @@ def register_routes(app):
             except ValueError:
                 flash("Invalid week selection!", category='warning')
                 return render_template('fixtures.html', title='Home', form=form)
-
-            # valid_teams = ['ARS', 'AST', 'BOU', 'BRE', 'BRI', 'CHE', 'CRY', 'EVE', 'FUL', 'IPS',
-            #     'LEI', 'LIV', 'MNC', 'MNU', 'NEW', 'NFO', 'SOU', 'TOT', 'WES', 'WOL']  # Define your list of valid teams here
-
             # Validate that home and away teams are in the valid_teams list
             for i in range(1,11):
                 if form[f'home_{i}'].data not in teams_names.values() or form[f'away_{i}'].data not in teams_names.values():
@@ -414,11 +402,11 @@ def register_routes(app):
 
 
     
+    """
     @app.route('/predict', methods=['GET', 'POST'])
     @login_required
     def predict():
         form = PredictionForm()
-
         weeks = Week.query.order_by(Week.week_number).all()  # Retrieve week numbers
         if weeks:
             form.game_week.data = max(week.week_number for week in weeks)
@@ -427,13 +415,11 @@ def register_routes(app):
         try:
             week = int(week)  # Convert to integer if possible
         except (TypeError, ValueError):
-            flash("Invalid week number provided!", category='danger')
-            return redirect(url_for('prediction_week'))
-
+            flash("Invalid week number provided! Set match week.", category='danger')
+            return redirect(url_for('match_week'))
         # Create empty lists for home and away teams
         home_teams = []
         away_teams = []
-
         # Query the Fixture table for the specified week
         fixture_data = Fixture.query.filter_by(week_id=week).first()
         if fixture_data:
@@ -442,13 +428,11 @@ def register_routes(app):
                 home, away = val.split('-')
                 home_teams.append(home)
                 away_teams.append(away)
-
             # Populate the form with home and away teams
             for i in range(len(home_teams)):
                 if i < 10:  # Ensure we don't exceed the form fields
                     form[f'home_{i + 1}'].data = home_teams[i]
                     form[f'away_{i + 1}'].data = away_teams[i]
-
         # When form is submitted
         if form.validate_on_submit():
             game_week = week
@@ -464,36 +448,33 @@ def register_routes(app):
                 user_id             = current_user.id,
                 user_predictions    = prediction_data
             )
-            db.session.add(prediction)
-            db.session.commit()
+            print(prediction_data)
+            #db.session.add(prediction)
+            #db.session.commit()
             flash(f"Predictions for Game Week {game_week} submitted.", 'success')
             return redirect(url_for('home'))
         return render_template('predict.html', title='Predict Results', form=form, week=week)
+   
+    """
 
-    
 
-    @app.route('/results', methods=['GET', 'POST'])
-    # @login_required
-    def results():
+    @app.route('/predict', methods=['GET', 'POST'])
+    @login_required
+    def predict():
         form = PredictionForm()
-
         weeks = Week.query.order_by(Week.week_number).all()  # Retrieve week numbers
-        if weeks:  # Check if there are any weeks
-            form.game_week.data = max(week.week_number for week in weeks)  # Set the highest week_number
+        if weeks:
+            form.game_week.data = max(week.week_number for week in weeks)
 
-        # Get and validate the week parameter
         week = form.game_week.data
-
         try:
             week = int(week)  # Convert to integer if possible
         except (TypeError, ValueError):
-            flash("Invalid week number provided!", category='danger')
-            return redirect(url_for('prediction_week'))
-
+            flash("Invalid week number provided! Set match week.", category='danger')
+            return redirect(url_for('match_week'))
         # Create empty lists for home and away teams
         home_teams = []
         away_teams = []
-
         # Query the Fixture table for the specified week
         fixture_data = Fixture.query.filter_by(week_id=week).first()
         if fixture_data:
@@ -502,13 +483,101 @@ def register_routes(app):
                 home, away = val.split('-')
                 home_teams.append(home)
                 away_teams.append(away)
-
             # Populate the form with home and away teams
             for i in range(len(home_teams)):
                 if i < 10:  # Ensure we don't exceed the form fields
                     form[f'home_{i + 1}'].data = home_teams[i]
                     form[f'away_{i + 1}'].data = away_teams[i]
+        # When form is submitted
+        if form.validate_on_submit():
+            print("Form validated successfully.")
+            game_week = week
+            prediction_data = {}
+            for i in range(1, 11):  # Iterate from 1 to 10 to populate predicted scores into a JSON-formatted text
+                prediction_data[f"{form[f'home_{i}'].data}-{form[f'away_{i}'].data}"] = {
+                    "home": f"{form[f'home_{i}_score'].data}",
+                    "away": f"{form[f'away_{i}_score'].data}"
+                }
+            # Check if the user's prediction already exists for the selected game_week
+            existing_prediction = Prediction.query.filter_by(user_id=current_user.id, week_id=game_week).first()
+            if existing_prediction:
+                
+                user_prediction = Prediction.query.filter_by(user_id=current_user.id, week_id=week).first()
+                data = user_prediction.user_predictions
+                matches = {}
+                if user_prediction:
+                    user_id = current_user.id
+                    name = current_user.name
+                    nickname = current_user.nickname
+                    user_email = current_user.username
+                    num = 1
+                    for key,val in data.items():
+                        ht,at = key.split("-")
+                        matches[f"Match {num}"] = {
+                                ht: val["home"],
+                                at: val["away"]
+                            }
+                        num += 1
+                    flash(f"You have already submitted predictions for week {week}.", 'info')
+                    return render_template('user_predictions.html', id=user_id, nickname=nickname, week=week, matches=matches, email=user_email)  # Return the JSON response
+            # Write/Save data to database
+            prediction = Prediction(
+                week_id             = game_week,
+                user_id             = current_user.id,
+                user_predictions    = prediction_data
+            )
+            #print(prediction_data)
+            db.session.add(prediction)
+            db.session.commit()
+            flash(f"Predictions for Game Week {game_week} submitted.", 'success')
+            return redirect(url_for('home'))
+        return render_template('predict.html', title='Predict Results', form=form, week=week)
+    
 
+
+    @app.route('/results', methods=['GET', 'POST'])
+    @login_required
+    def results():
+        # Check if the current user is an admin
+        if not (current_user.is_admin or current_user.id == 1):
+            flash("You do not have permission to access this page.", 'danger')
+            return redirect(url_for('home'))  # Redirect to home or another appropriate page
+
+        form = PredictionForm()
+        weeks = Week.query.order_by(Week.week_number).all()  # Retrieve week numbers
+        if weeks:  # Check if there are any weeks
+            form.game_week.data = max(week.week_number for week in weeks)  # Set the highest week_number
+
+        # Get and validate the week parameter
+        week = form.game_week.data
+        # Check if the week field is empty
+        if not week:
+            flash("Week number cannot be empty!", category='danger')
+            return redirect(url_for('match_week'))
+        try:
+            week = int(week)  # Convert to integer if possible
+        except (TypeError, ValueError):
+            flash("Invalid week number provided!", category='danger')
+            return redirect(url_for('match_week'))
+        
+        # Create empty lists for home and away teams
+        home_teams = []
+        away_teams = []
+        
+        # Query the Fixture table for the specified week
+        fixture_data = Fixture.query.filter_by(week_id=week).first()
+        if fixture_data:
+            data = fixture_data.matches
+            for key, val in data.items():
+                home, away = val.split('-')
+                home_teams.append(home)
+                away_teams.append(away)
+            # Populate the form with home and away teams
+            for i in range(len(home_teams)):
+                if i < 10:  # Ensure we don't exceed the form fields
+                    form[f'home_{i + 1}'].data = home_teams[i]
+                    form[f'away_{i + 1}'].data = away_teams[i]
+        
         if form.validate_on_submit():
             game_week = form.game_week.data
             results_data = {}
@@ -518,16 +587,21 @@ def register_routes(app):
                     "away": f"{form[f'away_{i}_score'].data}"
                 }
             # Write/Save data to database
-            results = Result(
-                week_id = game_week,
-                results = results_data
-            )
-            db.session.add(results)
-            db.session.commit()
-            flash(f"Results for Game Week {game_week} submitted.", 'success')
-            score()
-            return redirect(url_for('home'))
-
+            try:
+                results = Result(
+                    week_id=game_week,
+                    results=results_data
+                )
+                db.session.add(results)
+                db.session.commit()
+                score()
+                flash(f"Results for Game Week {game_week} submitted.", 'success')
+                return redirect(url_for('home'))
+            except Exception as e:
+                db.session.rollback()  # Rollback in case of error
+                flash("An error occurred while saving results: {e}", 'danger')
+                return redirect(url_for('results'))
+        
         return render_template('results.html', title='Enter Results', form=form, week=week)
 
 
@@ -592,7 +666,8 @@ def register_routes(app):
             if user_prediction:
                 user_id = user.id
                 name = user.name
-                user_email = user.email
+                nickname = user.nickname
+                user_email = user.username
                 num = 1
                 for key,val in data.items():
                     ht,at = key.split("-")
@@ -602,61 +677,98 @@ def register_routes(app):
                         }
                     num += 1
                 print(matches)
-                return render_template('get_user_predictions.html', id=user_id, name=name, week=week, matches=matches, email=user_email)  # Return the JSON response
+                return render_template('user_predictions.html', id=user_id, nickname=nickname, week=week, matches=matches, email=user_email)  # Return the JSON response
             flash('No predictions records', 'danger')
             return redirect(url_for('home'))
         return render_template('get_user_predictions.html', title='User Predictions', form=form)
 
 
 
+    @app.route('/user/week-prediction')
+    @login_required
+    def existing_prediction():
+        user_id = current_user.id
+        week = request.args.get('week')
+        try:
+            week = int(week)  # Convert to integer if possible
+        except (TypeError, ValueError):
+            flash("Invalid week number provided!", category='danger')
+            return redirect(url_for('predict'))
+
+        user = User.query.filter_by(id=user_id).first()
+
+        if user:
+            user_prediction = Prediction.query.filter_by(user_id=user.id, week_id=week)
+            data = user_prediction.user_predictions
+            matches = {}
+            if user_prediction:
+                user_id = user.id
+                name = user.name
+                nickname = user.nickname
+                user_email = user.username
+                num = 1
+                for key,val in data.items():
+                    ht,at = key.split("-")
+                    matches[f"Match {num}"] = {
+                            ht: val["home"],
+                            at: val["away"]
+                        }
+                    num += 1
+                print(matches)
+                return render_template('user_predictions.html', id=user_id, nickname=nickname, week=week, matches=matches, email=user_email)  # Return the JSON response         
+        return render_template('user_predictions.html')
+
+
+    from pprint import pprint
     @app.route('/get-predictions', methods=['GET' ,'POST'])
     def get_predictions():
-        form = SelectWeekForm() 
-        weeks = Week.query.order_by(Week.week_number).all()  # Retrieve week numbers
-        form.week.choices = [(week.week_number, f"Week {week.week_number}") for week in weeks]
-
-        # New code to set the highest week_number in the form
-        if weeks:  # Check if there are any weeks
-            form.week.data = max(week.week_number for week in weeks)  # Set the highest week_number
+        form = PredictionWeekForm()
+        weeks = Week.query.order_by(Week.week_number).all()  # Query all weeks from the database
+        form.week.choices = [(week.week_number, f"Week {week.week_number}") for week in weeks]  # Populate the form with week options
+            
 
         if form.validate_on_submit():
-            week = form.week.data
+            week = form.week.data  # Get the selected week
 
             try:
                 week = int(week)  # Convert to integer if possible
             except (TypeError, ValueError):
                 flash("Invalid week number provided!", category='danger')
                 return redirect(url_for('get_predictions'))
-            
+             
             team_names = reverse_team_names()
 
-            match_list = ["Name"]
+            match_list = ["Nickname || Email"]
             match_data = Fixture.query.filter_by(week_id=week).first()
             matches = match_data.matches
-    
+            print(matches)
             for key, val in matches.items():
                 h_team, a_team = val.split("-")
                 h_team = team_names[h_team]
                 a_team = team_names[a_team]
                 match_list.append(f"{h_team}-{a_team}")
-
+            
             full_scores = {}
-            print(full_scores)
 
-            users_data = User.query.order_by(User.name).all()
-            for user in users_data:
-                user_pred = Prediction.query.filter_by(week_id=week, user_id=user.id)#.first()
-                if user_pred and week == 1:  # Check if user predictions exist
-                    name = user.name
+            users = User.query.all()
+            for user in users:
+                user_pred = Prediction.query.filter_by(week_id=week, user_id=user.id).first()
+                if user_pred:  # Check if user predictions exist
+                    print("Function has values")
+                    username = user.username
+                    nickname = user.nickname
                     user_scores = []  # Ensure this is initialized as a list
-                    for key, val in user_pred[0].user_predictions.items():
+                    for key, val in user_pred.user_predictions.items():
                         home_team, away_team = key.split("-")
                         home_team = team_names[home_team]
                         away_team = team_names[away_team]
                         score = f"{val['home']}-{val['away']}"
                         user_scores.append(score)  # Ensure scores are appended correctly
                     # Clear user_scores only after processing all predictions for the user
-                    full_scores[name] = user_scores  # This should work as intended
+                    full_scores[f"{nickname} | {username}"] = user_scores  # This should work as intended
+                else:
+                    print(f"No predictions found for user: {user.name}")
+
             print(full_scores)
             return render_template('get_predictions.html', matches=match_list, scores=full_scores, week=week)
 
@@ -749,7 +861,7 @@ def register_routes(app):
             db.session.commit()
             user_points = 0       
         flash(f"Scores for Week {week} computed and saved successfully!", "success")
-        return redirect(url_for('home'))
+        return redirect(url_for('leaderboard'))
 
 
 
